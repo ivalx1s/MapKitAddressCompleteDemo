@@ -35,16 +35,6 @@
 			path = MapKitAddressCompleteDemo;
 			sourceTree = "<group>";
 		};
-		57BB8EB42D5466A80052EA91 /* MapKitAddressCompleteDemoTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = MapKitAddressCompleteDemoTests;
-			sourceTree = "<group>";
-		};
-		57BB8EBE2D5466A80052EA91 /* MapKitAddressCompleteDemoUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = MapKitAddressCompleteDemoUITests;
-			sourceTree = "<group>";
-		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -76,8 +66,6 @@
 			isa = PBXGroup;
 			children = (
 				57BB8EA32D5466A70052EA91 /* MapKitAddressCompleteDemo */,
-				57BB8EB42D5466A80052EA91 /* MapKitAddressCompleteDemoTests */,
-				57BB8EBE2D5466A80052EA91 /* MapKitAddressCompleteDemoUITests */,
 				57BB8EA22D5466A70052EA91 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -130,9 +118,6 @@
 			dependencies = (
 				57BB8EB32D5466A80052EA91 /* PBXTargetDependency */,
 			);
-			fileSystemSynchronizedGroups = (
-				57BB8EB42D5466A80052EA91 /* MapKitAddressCompleteDemoTests */,
-			);
 			name = MapKitAddressCompleteDemoTests;
 			packageProductDependencies = (
 			);
@@ -152,9 +137,6 @@
 			);
 			dependencies = (
 				57BB8EBD2D5466A80052EA91 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				57BB8EBE2D5466A80052EA91 /* MapKitAddressCompleteDemoUITests */,
 			);
 			name = MapKitAddressCompleteDemoUITests;
 			packageProductDependencies = (
@@ -404,6 +386,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -412,7 +395,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = IV.MapKitAddressCompleteDemo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -433,6 +416,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -441,7 +425,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = IV.MapKitAddressCompleteDemo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;

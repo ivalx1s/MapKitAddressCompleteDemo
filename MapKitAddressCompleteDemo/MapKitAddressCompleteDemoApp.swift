@@ -11,7 +11,7 @@ import SwiftUI
 struct MapKitAddressCompleteDemoApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            UI.Address.AddressFormView()
         }
     }
 }

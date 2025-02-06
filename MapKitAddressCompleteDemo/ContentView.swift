@@ -18,160 +18,98 @@ extension UI.Address {
         var body: some View {
             NavigationView {
                 ZStack {
-                    // Main scrollable content:
                     ScrollView {
                         VStack(spacing: 16) {
-                            autoDetectSection
-                            addressFields
-                            defaultAddressToggle
-                            saveButton
+                            AutoDetectSection(
+                                useAutoDetect: $viewModel.form.useAutoDetect,
+                                detectLocation: { await viewModel.detectLocation() }
+                            )
+                            AddressFields(
+                                searchQuery: $viewModel.searchQuery,
+                                form: $viewModel.form,
+                                cityResults: viewModel.cityResults,
+                                stateResults: viewModel.stateResults,
+                                refreshStreet: { viewModel.refreshStreetSuggestions() },
+                                showAutocomplete: $showAutocomplete,
+                                viewModel: viewModel
+                            )
+                            DefaultAddressToggle(isDefault: $viewModel.form.isDefault)
+                            SaveButton {
+                                try await viewModel.save()
+                                await MainActor.run { dismiss() }
+                            }
                         }
                         .padding()
                     }
                     
-                    // MARK: - Street Address Overlay
                     if showAutocomplete {
-                        VStack(spacing: 0) {
-                            // Suggestions list
-                            ScrollView {
-                                LazyVStack(alignment: .leading, spacing: 12) {
-                                    ForEach(viewModel.searchResults) { result in
-                                        Button {
-                                            dismissKeyboard()
-                                            viewModel.selectSearchResult(result)
-                                        } label: {
-                                            VStack(alignment: .leading) {
-                                                Text(result.title)
-                                                    .font(.body)
-                                                Text(result.subtitle)
-                                                    .font(.caption)
-                                                    .foregroundStyle(.secondary)
-                                            }
-                                            .padding(.vertical, 4)
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                }
-                                .padding(.horizontal)
-                            }
-                            .frame(maxHeight: 200)
-                            .background(Color(.systemBackground))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .shadow(radius: 2)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .bottom)
-                        .padding(.bottom, keyboardHeight)
-                        .padding(.horizontal)
-                        .overlay(alignment: .topTrailing) {
-                            // Xmark in top trailing
-                            HStack {
-                                Spacer()
-                                Button(action: {
-                                    withAnimation {
-                                        showAutocomplete = false
-                                    }
-                                    // Clear overlay suggestions only
+                        StreetAutocompleteOverlay(
+                            results: viewModel.searchResults,
+                            keyboardHeight: keyboardHeight,
+                            onSelect: { result in
+                                dismissKeyboard()
+                                viewModel.selectSearchResult(result)
+                            },
+                            onDismiss: {
+                                withAnimation {
+                                    showAutocomplete = false
                                     viewModel.searchResults = []
-                                }) {
-                                    Color.white // tap area
-                                        .opacity(0.01)
-                                        .frame(width: 60, height: 60)
-                                        .overlay {
-                                            Image(systemName: "xmark")
-                                                .font(.title2)
-                                                .foregroundColor(.secondary)
-                                        }
                                 }
-                                .padding(.trailing, 22)
-                                .padding(.top, -8)
                             }
-                        }
-                        .transition(.move(edge: .top).combined(with: .opacity).combined(with: .scale))
-                        .zIndex(1)
+                        )
                     }
                 }
                 .navigationTitle("Address")
                 .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button("Cancel") { dismiss() }
-                    }
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button(action: { viewModel.clearForm() }) {
-                            Image(systemName: "trash")
-                                .foregroundColor(.red)
-                        }
-                    }
-                }
-                // Subscribe to keyboard notifications
-                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
-                    if let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
-                        withAnimation {
-                            // Get the key window from the active window scene
-                            if let windowScene = UIApplication.shared.connectedScenes
-                                .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
-                               let keyWindow = windowScene.windows.first(where: { $0.isKeyWindow }) {
-                                
-                                let safeAreaBottomInset = keyWindow.safeAreaInsets.bottom
-                                let keyboardHeight = frame.height - safeAreaBottomInset
-                                self.keyboardHeight = keyboardHeight
-                                // Now use keyboardHeight as needed
-                            } else {
-                                // Fallback: if no active window is found, assume no safe area inset
-                                let keyboardHeight = frame.height
-                                self.keyboardHeight = keyboardHeight
-                            }
-                            
-                        }
-                    }
-                }
-                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-                    withAnimation {
-                        keyboardHeight = 0
-                    }
-                }
-                // Tap anywhere to reveal the overlay (if there's content to show)
-                .onTapGesture {
-                    withAnimation { showAutocomplete = true }
-                }
-                .onChange(of: viewModel.searchResults) { _, newResults in
-                    if !newResults.isEmpty {
-                        withAnimation {
-                            showAutocomplete = true
-                        }
-                    } else {
-                        withAnimation {
-                            showAutocomplete = false
-                        }
-                    }
-                    
+                .toolbar { toolbarContent }
+                .keyboardHandlers(
+                    keyboardHeight: $keyboardHeight,
+                    showAutocomplete: $showAutocomplete,
+                    searchResults: viewModel.searchResults
+                )
+                .onTapGesture { withAnimation { showAutocomplete = true } }
+            }
+        }
+        
+        @ToolbarContentBuilder
+        private var toolbarContent: some ToolbarContent {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button("Cancel") { dismiss() }
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: { viewModel.clearForm() }) {
+                    Image(systemName: "trash").foregroundColor(.red)
                 }
             }
         }
         
-        // MARK: - Dismiss Keyboard
         private func dismissKeyboard() {
             UIApplication.shared.sendAction(
                 #selector(UIResponder.resignFirstResponder),
                 to: nil, from: nil, for: nil
             )
         }
+    }
+    
+    // MARK: - Subviews
+    
+    private struct AutoDetectSection: View {
+        @Binding var useAutoDetect: Bool
+        let detectLocation: () async -> Void
         
-        // MARK: - Auto-Detect Section
-        private var autoDetectSection: some View {
+        var body: some View {
             VStack(alignment: .leading) {
                 Text("Add your address to see local stores")
                     .foregroundStyle(.secondary)
                 HStack {
                     VStack(alignment: .leading) {
                         Text("Automatically detect")
-                        Text("Enable location access")
-                            .foregroundStyle(.secondary)
+                        Text("Enable location access").foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Toggle("", isOn: $viewModel.form.useAutoDetect)
-                        .onChange(of: viewModel.form.useAutoDetect) { _, _ in
-                            Task { await viewModel.detectLocation() }
+                    Toggle("", isOn: $useAutoDetect)
+                        .onChange(of: useAutoDetect) { _, _ in
+                            Task { await detectLocation() }
                         }
                 }
                 .padding()
@@ -179,53 +117,69 @@ extension UI.Address {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             }
         }
+    }
+    
+    private struct AddressFields: View {
+        @Binding var searchQuery: String
+        @Binding var form: UI.Address.AddressForm
+        let cityResults: [UI.Address.CityInfo]
+        let stateResults: [UI.Address.StateInfo]
+        let refreshStreet: () -> Void
+        @Binding var showAutocomplete: Bool
+        @ObservedObject var viewModel: AddressFormViewModel
         
-        // MARK: - Address Fields
-        private var addressFields: some View {
+        var body: some View {
             VStack(spacing: 12) {
-                // Street (overlay suggestions)
-                TextField("Street address or P.O. Box", text: $viewModel.searchQuery)
+                TextField("Street address or P.O. Box", text: $searchQuery)
                     .textFieldStyle(.roundedBorder)
                     .onTapGesture {
                         withAnimation { showAutocomplete = true }
-                        viewModel.refreshStreetSuggestions()
+                        refreshStreet()
                     }
                 
-                // City (inline suggestions)
-                cityField
+                CityField(
+                    city: $form.city,
+                    state: $form.state,
+                    results: cityResults,
+                    viewModel: viewModel
+                )
                 
-                // State (inline suggestions)
-                stateField
+                StateField(
+                    state: $form.state,
+                    results: stateResults,
+                    viewModel: viewModel
+                )
                 
-                // ZIP
-                TextField("ZIP Code", text: $viewModel.form.zipCode)
+                TextField("ZIP Code", text: $form.zipCode)
                     .textFieldStyle(.roundedBorder)
                     .keyboardType(.numberPad)
             }
         }
+    }
+    
+    private struct CityField: View {
+        @Binding var city: String
+        @Binding var state: String
+        let results: [UI.Address.CityInfo]
+        @ObservedObject var viewModel: AddressFormViewModel
         
-        // MARK: - City Field
-        private var cityField: some View {
+        var body: some View {
             VStack(alignment: .leading) {
-                TextField("City", text: $viewModel.form.city)
+                TextField("City", text: $city)
                     .textFieldStyle(.roundedBorder)
-                    .onChange(of: viewModel.form.city) { _, newValue in
+                    .onChange(of: city) { _, newValue in
                         Task {
                             guard !viewModel.isAutocompleteFilling else { return }
-                            try await viewModel.searchCities(for: newValue, in: viewModel.form.state)
+                            try await viewModel.searchCities(for: newValue, in: state)
                         }
                     }
                 
-                // Inline suggestions
-                if !viewModel.cityResults.isEmpty {
+                if !results.isEmpty {
                     InlineSuggestionsListView(
-                        suggestions: viewModel.cityResults,
+                        suggestions: results,
                         onSelect: { city in
-                            viewModel.form.city = city.name
-                            // If no state is provided, fill from city’s state
-                            if viewModel.form.state.isEmpty {
-                                viewModel.form.state = city.state
-                            }
+                            self.city = city.name
+                            if state.isEmpty { state = city.state }
                             viewModel.cityResults = []
                         },
                         content: { city in
@@ -235,23 +189,26 @@ extension UI.Address {
                 }
             }
         }
+    }
+    
+    private struct StateField: View {
+        @Binding var state: String
+        let results: [UI.Address.StateInfo]
+        @ObservedObject var viewModel: AddressFormViewModel
         
-        // MARK: - State Field
-        private var stateField: some View {
+        var body: some View {
             VStack(alignment: .leading) {
-                TextField("State", text: $viewModel.form.state)
+                TextField("State", text: $state)
                     .textFieldStyle(.roundedBorder)
-                    .onChange(of: viewModel.form.state) { _, newValue in
+                    .onChange(of: state) { _, newValue in
                         Task {
                             guard !viewModel.isAutocompleteFilling else { return }
-                            // If user typed an abbreviation, fill it directly
-                            if let state = AddressFormViewModel.states.first(where: {
+                            if let stateItem = AddressFormViewModel.states.first(where: {
                                 $0.abbreviation.lowercased() == newValue.lowercased()
                             }) {
-                                viewModel.form.state = state.name
+                                self.state = stateItem.name
                                 viewModel.stateResults = []
                             } else if !newValue.isEmpty {
-                                // Search a partial name or mismatch
                                 await viewModel.searchStates(newValue)
                             } else {
                                 viewModel.stateResults = []
@@ -259,46 +216,65 @@ extension UI.Address {
                         }
                     }
                 
-                // Inline suggestions
-                if !viewModel.stateResults.isEmpty {
-                    ScrollView {
-                        LazyVStack(alignment: .leading) {
-                            ForEach(viewModel.stateResults) { stateItem in
-                                Button {
-                                    viewModel.stateResults = []
-                                    viewModel.form.state = stateItem.name
-                                } label: {
-                                    HStack {
-                                        Text(stateItem.name)
-                                        Spacer()
-                                        Text(stateItem.abbreviation)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    .padding(.vertical, 8)
-                                    .padding(.horizontal, 12)
-                                }
-                                .buttonStyle(.plain)
-                            }
+                if !results.isEmpty {
+                    StateSuggestionsView(
+                        results: results,
+                        onSelect: { stateItem in
+                            viewModel.stateResults = []
+                            self.state = stateItem.name
                         }
-                    }
-                    .frame(maxHeight: 200)
-                    .background(Color(.systemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .shadow(radius: 2)
+                    )
                 }
             }
         }
+    }
+    
+    private struct StateSuggestionsView: View {
+        let results: [UI.Address.StateInfo]
+        let onSelect: (UI.Address.StateInfo) -> Void
         
-        // MARK: - Toggles & Buttons
-        private var defaultAddressToggle: some View {
-            Toggle("Set as default address", isOn: $viewModel.form.isDefault)
+        var body: some View {
+            ScrollView {
+                LazyVStack(alignment: .leading) {
+                    ForEach(results) { item in
+                        Button {
+                            onSelect(item)
+                        } label: {
+                            HStack {
+                                Text(item.name)
+                                Spacer()
+                                Text(item.abbreviation)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 12)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .frame(maxHeight: 200)
+            .background(Color(.systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .shadow(radius: 2)
         }
+    }
+    
+    private struct DefaultAddressToggle: View {
+        @Binding var isDefault: Bool
         
-        private var saveButton: some View {
+        var body: some View {
+            Toggle("Set as default address", isOn: $isDefault)
+        }
+    }
+    
+    private struct SaveButton: View {
+        let action: () async throws -> Void
+        
+        var body: some View {
             Button {
                 Task {
-                    try await viewModel.save()
-                    await MainActor.run { dismiss() }
+                    try await action()
                 }
             } label: {
                 Text("Save")
@@ -309,5 +285,95 @@ extension UI.Address {
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
         }
+    }
+    
+    private struct StreetAutocompleteOverlay: View {
+        let results: [UI.Address.AddressSearchResult]
+        let keyboardHeight: CGFloat
+        let onSelect: (UI.Address.AddressSearchResult) -> Void
+        let onDismiss: () -> Void
+        
+        var body: some View {
+            VStack(spacing: 0) {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 12) {
+                        ForEach(results) { result in
+                            Button {
+                                onSelect(result)
+                            } label: {
+                                VStack(alignment: .leading) {
+                                    Text(result.title).font(.body)
+                                    Text(result.subtitle).font(.caption).foregroundStyle(.secondary)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+                .frame(maxHeight: 200)
+                .background(Color(.systemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .shadow(radius: 2)
+            }
+            .padding(.bottom, keyboardHeight)
+            .padding(.horizontal)
+            .overlay(alignment: .topTrailing) {
+                HStack {
+                    Spacer()
+                    Button(action: onDismiss) {
+                        Color.white.opacity(0.01)
+                            .frame(width: 60, height: 60)
+                            .overlay {
+                                Image(systemName: "xmark")
+                                    .font(.title2)
+                                    .foregroundColor(.secondary)
+                            }
+                    }
+                    .padding(.trailing, 22)
+                    .padding(.top, -8)
+                }
+            }
+            .transition(.move(edge: .top).combined(with: .opacity).combined(with: .scale))
+            .zIndex(1)
+        }
+    }
+}
+
+// MARK: - View Modifiers
+
+private extension View {
+    func keyboardHandlers(
+        keyboardHeight: Binding<CGFloat>,
+        showAutocomplete: Binding<Bool>,
+        searchResults: [UI.Address.AddressSearchResult]
+    ) -> some View {
+        self
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
+                if let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
+                    withAnimation {
+                        if let windowScene = UIApplication.shared.connectedScenes
+                            .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
+                           let keyWindow = windowScene.windows.first(where: { $0.isKeyWindow }) {
+                            
+                            let safeAreaBottomInset = keyWindow.safeAreaInsets.bottom
+                            keyboardHeight.wrappedValue = frame.height - safeAreaBottomInset
+                        } else {
+                            keyboardHeight.wrappedValue = frame.height
+                        }
+                    }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+                withAnimation {
+                    keyboardHeight.wrappedValue = 0
+                }
+            }
+            .onChange(of: searchResults) { _, newResults in
+                withAnimation {
+                    showAutocomplete.wrappedValue = !newResults.isEmpty
+                }
+            }
     }
 }

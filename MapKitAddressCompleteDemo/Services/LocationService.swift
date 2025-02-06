@@ -25,7 +25,24 @@ extension UI.Address {
         
         func requestLocation(completion: @escaping @Sendable (Result<CLLocation, Error>) -> Void) {
             self.completion = completion
-            locationManager.requestWhenInUseAuthorization()
+            
+            let status = locationManager.authorizationStatus
+            switch status {
+            case .authorizedWhenInUse, .authorizedAlways:
+                // Already authorized, so immediately request location
+                locationManager.requestLocation()
+                
+            case .notDetermined:
+                // Not determined yet, so this *will* trigger
+                // locationManagerDidChangeAuthorization(_:) eventually
+                locationManager.requestWhenInUseAuthorization()
+                
+            case .denied, .restricted:
+                completion(.failure(LocationError.accessDenied))
+                
+            @unknown default:
+                break
+            }
         }
     }
 }
